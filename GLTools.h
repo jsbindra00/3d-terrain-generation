@@ -17,22 +17,21 @@
 namespace nr {
 	namespace util {
 		std::string ReadFile(const std::string& fileName) {
-			// 1. retrieve the vertex/fragment source code from filePath
 			std::string srcCode;
 			std::ifstream vShaderFile;
-			// ensure ifstream objects can throw exceptions:
 			vShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-
-			// open files
 			vShaderFile.open(fileName);
 			std::stringstream vShaderStream, fShaderStream;
-			// read file's buffer contents into streams
 			vShaderStream << vShaderFile.rdbuf();
-			// close file handlers
 			vShaderFile.close();
-			// convert stream into string
 			return vShaderStream.str();
-
+		}
+		sf::Image LoadImage(const std::string& fileName) {
+			sf::Image img;
+			if (img.loadFromFile(fileName)) {
+				return img;
+			}
+			throw std::exception();
 		}
 	}
 
@@ -42,31 +41,27 @@ namespace nr {
 		enum class VERTEXATTRIBUTE : GLuint {
 			POSITION = 0,
 			COLOR = 1,
-			VELOCITY = 2,
-			ANGLE = 3
 		};
 		class Camera {
 		private:
+			float scroll{ 0 };
 			float pitch{ 0 };
 			float yaw{ 90 };
 			float roll{ 0 };
 
 			glm::vec3 cameraPosition_;
-
-			// ihat for camera
 			glm::vec3 cameraFront_;
-
-			// jhat for camera
 			glm::vec3 cameraUp_;
 			glm::mat4 viewMatrix_;
+
 			const float cameraSpeed_ = 1.5;
 			const float eulerSpeed_ = 4;
-
 			void UpdateRotation() {
-				glm::vec3 direction;
-				direction.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
-				direction.y = sin(glm::radians(pitch));
-				direction.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+				glm::vec3 direction = glm::vec3(
+					cos(glm::radians(yaw)) * cos(glm::radians(pitch)),
+					sin(glm::radians(pitch)),
+					sin(glm::radians(yaw)) * cos(glm::radians(pitch))
+				);
 				cameraFront_ = glm::normalize(direction);
 			}
 		public:
@@ -76,47 +71,39 @@ namespace nr {
 				cameraUp_ = glm::vec3(0.0f, 1.0f, 0.0f);
 				cameraFront_ = glm::vec3(-2.0f, -2.0f, -1.0f);
 				UpdateRotation();
-
-
 			}
-
-			void MoveNorth() {
-				// traverse in the direction of the front vector.
+			inline void MoveNorth() {
 				cameraPosition_ = cameraPosition_ + cameraSpeed_ * cameraFront_;
 			}
-			void MoveSouth() {
+			inline void MoveSouth() {
 				cameraPosition_ -= cameraSpeed_ * cameraFront_;
 			}
-			void MoveWest() {
+			inline void MoveWest() {
 				cameraPosition_ += cameraSpeed_ * glm::normalize(glm::cross(cameraFront_, cameraUp_));
 			}
-			void MoveEast() {
+			inline void MoveEast() {
 				cameraPosition_ -= cameraSpeed_ * glm::normalize(glm::cross(cameraFront_, cameraUp_));
 			}
-
-			// pitch
-			void LookUp() {
+			inline void LookUp() {
 				pitch += eulerSpeed_;
 				UpdateRotation();
 			}
-			void LookDown() {
+			inline void LookDown() {
 				pitch -= eulerSpeed_;
 				UpdateRotation();
-
 			}
-			// yaw
-			void LookLeft() {
+			inline void LookLeft() {
 				yaw -= eulerSpeed_;
 				UpdateRotation();
 
 			}
-			void LookRight() {
+			inline void LookRight() {
 				yaw += eulerSpeed_;
 				UpdateRotation();
 			}
-			inline glm::vec3 CameraPosition() const noexcept { return cameraPosition_; }
-			inline glm::vec3 CameraUp() const noexcept { return cameraUp_; }
-			inline glm::vec3 CameraFront() const noexcept { return cameraFront_; }
+			inline glm::vec3 Position() const noexcept { return cameraPosition_; }
+			inline glm::vec3 Up() const noexcept { return cameraUp_; }
+			inline glm::vec3 Front() const noexcept { return cameraFront_; }
 		};
 		class Shader {
 		private:
@@ -211,7 +198,6 @@ namespace nr {
 				GLuint uniformLoc = GetLocation(uniformName);
 				glUniform1i(uniformLoc, val);
 			}
-
 			void SetUniformFloat(const std::string& uniformName, const float& val) {
 				GLuint uniformLoc = GetLocation(uniformName);
 				glUniform1f(uniformLoc, val);
@@ -219,25 +205,7 @@ namespace nr {
 		};
 	}
 }
-
-
-
 namespace nr {
-	namespace util {
-		float RADIUS = 0.05;
-		float GetElapsedTime() {
-			return glfwGetTime();
-		}
-
-
-		sf::Image LoadImage(const std::string& fileName) {
-			sf::Image img;
-			if (img.loadFromFile(fileName)) {
-				return img;
-			}
-			throw "fuck";
-		}
-	}
 	namespace callbacks {
 		void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
 			switch (key) {
@@ -317,14 +285,11 @@ namespace nr {
 			}
 			inline void InitCallbacks() {
 				glfwSetKeyCallback(nr::driver::window_, &nr::callbacks::KeyCallback);
-
-
 			}
 
 			void InitMesh(std::vector<float>& vertices, std::vector<unsigned int>& indices) {
 				// load up the height map 
 				sf::Image heightMap = nr::util::LoadImage("map.jpg");
-
 				sf::Vector2u mapDim{ heightMap.getSize() };
 
 				// generate a X-Z vertex plane
@@ -335,77 +300,41 @@ namespace nr {
 				const sf::Uint8* pxls = heightMap.getPixelsPtr();
 				for (unsigned int j = 0; j < mapDim.y; ++j) {
 					for (unsigned int i = 0; i < mapDim.x; ++i) {
-
-
 						sf::Color col = heightMap.getPixel(i, j);
 						float colavg = col.r + col.g + col.b;
 						colavg /= 255;
-
-						// XYZ coords
-						vertices.push_back(i * VERTEX_X_SPACE);
-
-						// translate the pixel intensity to a y value
-						sf::Uint8 pxl = pxls[j * mapDim.x + i];
-
-						vertices.push_back((MAX_Y*colavg) / 255);
-
-						vertices.push_back(j * VERTEX_Z_SPACE);
+						vertices.insert(vertices.end(),
+							{ i * VERTEX_X_SPACE ,
+							(MAX_Y * colavg) / 255 ,
+							j * VERTEX_Z_SPACE
+							});
 					}
 				}
-
-
-
 				for (unsigned int j = 0; j < mapDim.y - 1; ++j) {
-					for (unsigned int i = 0; i < mapDim.y - 1; ++i) {
-
+					for (unsigned int i = 0; i < mapDim.x - 1; ++i) {
 						unsigned int index = j * mapDim.x + i;
-						// bot left
 						indices.push_back(index);
-
-						// bot right
 						indices.push_back(index + 1);
-
-						// alternating pattern in mesh
 						if (i % 2 == 0) {
-
-
-							// top right           to end               to col
-							indices.push_back(index + mapDim.x + 1);
-
-							// bot left
-							indices.push_back(index);
-
-							// top left
-							indices.push_back(index + mapDim.x);
-
-							// top right
-							indices.push_back(index + mapDim.x + 1);
-
+							indices.insert(indices.end(),
+								{
+									index + mapDim.x + 1,
+									index,
+									index + mapDim.x,
+									index + mapDim.x + 1
+								});
+							continue;
 						}
-						else {
-							// top left
-							indices.push_back(index + mapDim.x);
-
-							// top left
-							indices.push_back(index + mapDim.x);
-
-							// top right
-							indices.push_back(index + mapDim.x + 1);
-
-							// bot right
-							indices.push_back(index + 1);
-						}
+						indices.insert(indices.end(),
+							{
+								index + mapDim.x,
+								index + mapDim.x,
+								index + mapDim.x + 1,
+								index + 1
+							});
 					}
 				}
-
-
-
-
-
 				NUM_POINTS = vertices.size();
-
-				// initialise a 2d mesh.
-
 			}
 			void InitArrays() {
 
@@ -453,17 +382,8 @@ namespace nr {
 			}
 			void InitShaders() {
 				shaderProgram_ = std::make_unique<nr::driver::Program>();
-
-				// vertex shader
 				shaderProgram_->RegisterShader(std::make_unique<nr::driver::Shader>(GL_VERTEX_SHADER, "vertexShader", "vertexShader.vert"));
-
-				// vertex shader 2
-				
-
-				// fragment shader
 				shaderProgram_->RegisterShader(std::make_unique<nr::driver::Shader>(GL_FRAGMENT_SHADER, "fragmentShader", "fragmentShader.frag"));
-
-			
 			}
 			bool InitProgram(const unsigned int& windowWidth, const unsigned int& windowHeight, const char* windowName) {
 				if (!glfwInit() || !InitWindow(windowWidth, windowHeight, windowName) || !InitContext()) return false;
@@ -472,37 +392,28 @@ namespace nr {
 				InitShaders();
 				shaderProgram_->Run();
 				return gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
-			
 			}
 		}
 		void Render() {
 			shaderProgram_->Use();
 			projectionMatrix_ = glm::mat4(1.0f);
-			projectionMatrix_ = glm::perspective(glm::radians(45.0f), (float)1000 / (float)1000, 0.1f, 100.0f);
+			projectionMatrix_ = glm::perspective(glm::radians(45.0f), (float)1000 / (float)1000, 0.1f, 500.0f);
 			shaderProgram_->SetUniformMat4("projectionMatrix", projectionMatrix_);
-
 
 			int frameNumber = 0;
 			while (!glfwWindowShouldClose(window_)) {
-				// clear the screen
 				glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
 				glClear(GL_COLOR_BUFFER_BIT);
 
-
-
 				glm::mat4 viewMatrix_ = glm::mat4(1.0f);
-				viewMatrix_ = glm::lookAt(camera_->CameraPosition(), camera_->CameraPosition() + camera_->CameraFront(), camera_->CameraUp());
+				viewMatrix_ = glm::lookAt(camera_->Position(), camera_->Position() + camera_->Front(), camera_->Up());
 
 				shaderProgram_->Use();
 				shaderProgram_->SetUniformMat4("viewMatrix", viewMatrix_);
-
+				shaderProgram_->SetUniformFloat("time", glfwGetTime());
 
 				glBindVertexArray(VAO_);
-				//glDrawArrays(GL_TRIANGLES, 0, 4);
-				glDrawElements(GL_TRIANGLES, NUM_POINTS, GL_UNSIGNED_INT, 0);
-
-	
-
+				glDrawElements(GL_TRIANGLES, 1000*1000, GL_UNSIGNED_INT, 0);
 
 				glfwPollEvents();
 				glfwSwapBuffers(window_);
