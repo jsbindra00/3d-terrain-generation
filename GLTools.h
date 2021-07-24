@@ -286,7 +286,6 @@ namespace nr {
 			inline void InitCallbacks() {
 				glfwSetKeyCallback(nr::driver::window_, &nr::callbacks::KeyCallback);
 			}
-
 			void InitMesh(std::vector<float>& vertices, std::vector<unsigned int>& indices) {
 				// load up the height map 
 				sf::Image heightMap = nr::util::LoadImage("map.jpg");
@@ -295,18 +294,27 @@ namespace nr {
 				// generate a X-Z vertex plane
 				const float VERTEX_X_SPACE = 1;
 				const float VERTEX_Z_SPACE = 1;
-				const float MAX_Y = pow(2,11);
+				const float MAX_Y = pow(2,4);
 
 				const sf::Uint8* pxls = heightMap.getPixelsPtr();
 				for (unsigned int j = 0; j < mapDim.y; ++j) {
 					for (unsigned int i = 0; i < mapDim.x; ++i) {
 						sf::Color col = heightMap.getPixel(i, j);
-						float colavg = col.r + col.g + col.b;
+						float colavg = (col.r + col.g + col.b) / (3);
 						colavg /= 255;
+						float y = MAX_Y * colavg;
+						int b = 3;
 						vertices.insert(vertices.end(),
-							{ i * VERTEX_X_SPACE ,
-							(MAX_Y * colavg) / 255 ,
+							{ i * VERTEX_X_SPACE,
+							y ,
 							j * VERTEX_Z_SPACE
+							});
+						HSV::RGB vertexCol{ HSV::HSVtoRGB(360 * y / MAX_Y, 100, 100) };
+						vertices.insert(vertices.end(),
+							{
+								vertexCol.r / 255,
+								vertexCol.g / 255,
+								vertexCol.b / 255
 							});
 					}
 				}
@@ -337,48 +345,26 @@ namespace nr {
 				NUM_POINTS = vertices.size();
 			}
 			void InitArrays() {
-
 				std::vector<float> vertices;
 				std::vector<unsigned int> indices;
 
 				InitMesh(vertices, indices);
-
-				// store a single VAO, which stores a single VBO for all particles.
 				glGenVertexArrays(1, &VAO_);
-				// bind the VAO
 				glBindVertexArray(VAO_);
 
-				// generate a VBO handle
 				glGenBuffers(1, &VBO_);
-
-				// generate an EBO handle
 				glGenBuffers(1, &EBO_);
 
-				// copy the data into the VBO
-				// bind the VBO
 				glBindBuffer(GL_ARRAY_BUFFER, VBO_);
-
-				// copy the vertex data into the vbo.
 				glBufferData(GL_ARRAY_BUFFER, sizeof(float) * vertices.size(), vertices.data(), GL_DYNAMIC_DRAW);
 
-				// bind the vertex attrib pointers.
-
-				// bind the position
-				glVertexAttribPointer(static_cast<GLuint>(nr::driver::VERTEXATTRIBUTE::POSITION), 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, (void*)0);
-
-		
-
-				// enable the vertex attributes
-				glEnableVertexAttribArray(static_cast<GLuint>(nr::driver::VERTEXATTRIBUTE::POSITION));
-
-
-				// bind the ebo.
 				glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO_);
+				glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(float), indices.data(), GL_STATIC_DRAW);
 
-				// copy the index data into the ebo.
-				glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size()*sizeof(float), indices.data(), GL_STATIC_DRAW);
-
-				std::cout << "done" << std::endl;
+				glVertexAttribPointer(static_cast<GLuint>(nr::driver::VERTEXATTRIBUTE::POSITION), 3, GL_FLOAT, GL_FALSE, sizeof(float) * 6, (void*)0);
+				glVertexAttribPointer(static_cast<GLuint>(nr::driver::VERTEXATTRIBUTE::COLOR), 3, GL_FLOAT, GL_FALSE, sizeof(float) * 6, (void*)(3 * sizeof(float)));
+				glEnableVertexAttribArray(static_cast<GLuint>(nr::driver::VERTEXATTRIBUTE::COLOR));
+				glEnableVertexAttribArray(static_cast<GLuint>(nr::driver::VERTEXATTRIBUTE::POSITION));
 			}
 			void InitShaders() {
 				shaderProgram_ = std::make_unique<nr::driver::Program>();
