@@ -54,7 +54,7 @@ namespace nr {
 			glm::vec3 cameraUp_;
 			glm::mat4 viewMatrix_;
 
-			const float cameraSpeed_ = 1.5;
+			const float cameraSpeed_ = 15;
 			const float eulerSpeed_ = 4;
 			void UpdateRotation() {
 				glm::vec3 direction = glm::vec3(
@@ -288,7 +288,7 @@ namespace nr {
 			}
 			void InitMesh(std::vector<float>& vertices, std::vector<unsigned int>& indices) {
 				// load up the height map 
-				sf::Image heightMap = nr::util::LoadImage("map.jpg");
+				sf::Image heightMap = nr::util::LoadImage("einstein.jpg");
 				sf::Vector2u mapDim{ heightMap.getSize() };
 
 				// generate a X-Z vertex plane
@@ -300,16 +300,14 @@ namespace nr {
 				for (unsigned int j = 0; j < mapDim.y; ++j) {
 					for (unsigned int i = 0; i < mapDim.x; ++i) {
 						sf::Color col = heightMap.getPixel(i, j);
-						float colavg = (col.r + col.g + col.b) / (3);
-						colavg /= 255;
+						auto colavg = (col.r + col.g + col.b) / static_cast<float>((255*3));
 						float y = MAX_Y * colavg;
-						int b = 3;
 						vertices.insert(vertices.end(),
 							{ i * VERTEX_X_SPACE,
 							y ,
 							j * VERTEX_Z_SPACE
 							});
-						HSV::RGB vertexCol{ HSV::HSVtoRGB(360 * y / MAX_Y, 100, 100) };
+						HSV::RGB vertexCol{ HSV::HSVtoRGB( (360 * y / MAX_Y), 100, 100) };
 						vertices.insert(vertices.end(),
 							{
 								vertexCol.r / 255,
@@ -383,7 +381,7 @@ namespace nr {
 		void Render() {
 			shaderProgram_->Use();
 			projectionMatrix_ = glm::mat4(1.0f);
-			projectionMatrix_ = glm::perspective(glm::radians(45.0f), (float)1000 / (float)1000, 0.1f, 500.0f);
+			projectionMatrix_ = glm::perspective(glm::radians(45.0f), (float)1000 / (float)1000, 0.1f, 10000.0f);
 			shaderProgram_->SetUniformMat4("projectionMatrix", projectionMatrix_);
 
 			int frameNumber = 0;
@@ -399,7 +397,7 @@ namespace nr {
 				shaderProgram_->SetUniformFloat("time", glfwGetTime());
 
 				glBindVertexArray(VAO_);
-				glDrawElements(GL_TRIANGLES, 1000*1000, GL_UNSIGNED_INT, 0);
+				glDrawElements(GL_TRIANGLES, NUM_POINTS*3, GL_UNSIGNED_INT, 0);
 
 				glfwPollEvents();
 				glfwSwapBuffers(window_);
